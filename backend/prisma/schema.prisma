@@ -1,0 +1,159 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── USUÁRIOS / TERAPEUTAS ────────────────────────────────
+model User {
+  id                String   @id @default(cuid())
+  name              String
+  email             String   @unique
+  password          String
+  role              Role     @default(THERAPIST)
+  specialty         String?
+  color             String   @default("#4A8FC4")
+  commissionPercent Float    @default(0)
+  active            Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  patients       Patient[]
+  appointments   Appointment[]
+  sessionNotes   SessionNote[]
+  clinicPayments ClinicPayment[]
+
+  @@map("users")
+}
+
+enum Role {
+  ADMIN
+  THERAPIST
+}
+
+// ─── SALAS ────────────────────────────────────────────────
+model Room {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  color       String   @default("#5BBD7A")
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  appointments Appointment[]
+
+  @@map("rooms")
+}
+
+// ─── PACIENTES ────────────────────────────────────────────
+model Patient {
+  id           String    @id @default(cuid())
+  name         String
+  birthDate    DateTime?
+  cpf          String?
+  diagnosis    String?
+  sessionValue Float     @default(0)
+  notes        String?
+  active       Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  guardianName  String?
+  guardianPhone String?
+  addressCep    String?
+  addressRua    String?
+  addressNumero String?
+  addressBairro String?
+  addressCidade String?
+  addressEstado String?
+
+  therapistId  String
+  therapist    User          @relation(fields: [therapistId], references: [id])
+  appointments Appointment[]
+  sessionNotes SessionNote[]
+
+  @@map("patients")
+}
+
+// ─── AGENDAMENTOS ─────────────────────────────────────────
+model Appointment {
+  id         String            @id @default(cuid())
+  date       DateTime
+  hour       String
+  duration   Int               @default(50)
+  status     AppointmentStatus @default(CONFIRMED)
+  absent     Boolean           @default(false)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  patientId   String
+  patient     Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  therapistId String
+  therapist   User         @relation(fields: [therapistId], references: [id])
+  roomId      String?
+  room        Room?        @relation(fields: [roomId], references: [id])
+  sessionNote SessionNote?
+
+  @@map("appointments")
+}
+
+enum AppointmentStatus {
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+// ─── NOTAS DE SESSÃO ──────────────────────────────────────
+model SessionNote {
+  id            String   @id @default(cuid())
+  sessionNumber Int
+  date          DateTime
+  absent        Boolean  @default(false)
+  observations  String?
+  mood          String?
+  techniques    String[] @default([])
+  plan          String?
+  report        String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  appointmentId String      @unique
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  patientId     String
+  patient       Patient     @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  therapistId   String
+  therapist     User        @relation(fields: [therapistId], references: [id])
+
+  @@map("session_notes")
+}
+
+// ─── PAGAMENTOS DO TERAPEUTA À CLÍNICA ────────────────────
+model ClinicPayment {
+  id         String              @id @default(cuid())
+  year       Int
+  month      Int
+  amount     Float
+  paidAmount Float?
+  paidAt     DateTime?
+  status     ClinicPaymentStatus @default(PENDING)
+  notes      String?
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  therapistId String
+  therapist   User   @relation(fields: [therapistId], references: [id])
+
+  @@unique([therapistId, year, month])
+  @@map("clinic_payments")
+}
+
+enum ClinicPaymentStatus {
+  PENDING
+  PARTIAL
+  PAID
+}
